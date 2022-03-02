@@ -217,6 +217,10 @@ those values can be listed in braces, with the default appearing first::
   order : {'C', 'F', 'A'}
       Description of `order`.
 
+For keyword-only arguments, use ``keyword-only``::
+
+  x : int, keyword-only
+      
 When two or more input parameters have exactly the same type, shape and
 description, they can be combined::
 
