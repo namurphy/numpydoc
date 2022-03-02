@@ -41,16 +41,13 @@ class SphinxDocString(NumpyDocString):
 
     # string conversion routines
     def _str_header(self, name, symbol='`'):
-        return ['.. rubric:: ' + name, '']
+        return [f'.. rubric:: {name}', '']
 
     def _str_field_list(self, name):
-        return [':' + name + ':']
+        return [f':{name}:']
 
     def _str_indent(self, doc, indent=4):
-        out = []
-        for line in doc:
-            out += [' '*indent + line]
-        return out
+        return [' '*indent + line for line in doc]
 
     def _str_signature(self):
         return ['']
@@ -62,13 +59,13 @@ class SphinxDocString(NumpyDocString):
         return self['Extended Summary'] + ['']
 
     def _str_returns(self, name='Returns'):
-        named_fmt = '**%s** : %s'
-        unnamed_fmt = '%s'
-
         out = []
         if self[name]:
             out += self._str_field_list(name)
             out += ['']
+            named_fmt = '**%s** : %s'
+            unnamed_fmt = '%s'
+
             for param in self[name]:
                 param_type = param.type
                 if param_type and self.xref_param_type:
@@ -93,9 +90,9 @@ class SphinxDocString(NumpyDocString):
 
     def _escape_args_and_kwargs(self, name):
         if name[:2] == '**':
-            return r'\*\*' + name[2:]
+            return f'\\*\\*{name[2:]}'
         elif name[:1] == '*':
-            return r'\*' + name[1:]
+            return f'\\*{name[1:]}'
         else:
             return name
 
@@ -154,22 +151,13 @@ class SphinxDocString(NumpyDocString):
         if not (param_obj and obj_doc):
             return display_param, desc
 
-        prefix = getattr(self, '_name', '')
-        if prefix:
-            link_prefix = f'{prefix}.'
-        else:
-            link_prefix = ''
-
+        link_prefix = f'{prefix}.' if (prefix := getattr(self, '_name', '')) else ''
         # Referenced object has a docstring
         display_param = f':obj:`{param} <{link_prefix}{param}>`'
         if obj_doc:
             # Overwrite desc. Take summary logic of autosummary
             desc = re.split(r'\n\s*\n', obj_doc.strip(), 1)[0]
-            # XXX: Should this have DOTALL?
-            #      It does not in autosummary
-            m = re.search(r"^([A-Z].*?\.)(?:\s|$)",
-                          ' '.join(desc.split()))
-            if m:
+            if m := re.search(r"^([A-Z].*?\.)(?:\s|$)", ' '.join(desc.split())):
                 desc = m.group(1).strip()
             else:
                 desc = desc.partition('\n')[0]
@@ -268,12 +256,12 @@ class SphinxDocString(NumpyDocString):
                 out += [''] + autosum
 
             if others:
-                maxlen_0 = max(3, max([len(p.name) + 4 for p in others]))
+                maxlen_0 = max(3, max(len(p.name) + 4 for p in others))
                 hdr = "=" * maxlen_0 + "  " + "=" * 10
                 fmt = '%%%ds  %%s  ' % (maxlen_0,)
                 out += ['', '', hdr]
                 for param in others:
-                    name = "**" + param.name.strip() + "**"
+                    name = f"**{param.name.strip()}**"
                     desc = " ".join(x.strip()
                                           for x in param.desc).strip()
                     if param.type:
@@ -337,26 +325,30 @@ class SphinxDocString(NumpyDocString):
             # so we need to insert links to it
             out += ['.. only:: latex', '']
             items = []
-            for line in self['References']:
-                m = re.match(r'.. \[([a-z0-9._-]+)\]', line, re.I)
-                if m:
-                    items.append(m.group(1))
+            items.extend(
+                m.group(1)
+                for line in self['References']
+                if (m := re.match(r'.. \[([a-z0-9._-]+)\]', line, re.I))
+            )
+
             out += ['   ' + ", ".join([f"[{item}]_" for item in items]), '']
         return out
 
     def _str_examples(self):
         examples_str = "\n".join(self['Examples'])
 
-        if (self.use_plots and re.search(IMPORT_MATPLOTLIB_RE, examples_str)
-                and 'plot::' not in examples_str):
-            out = []
-            out += self._str_header('Examples')
-            out += ['.. plot::', '']
-            out += self._str_indent(self['Examples'])
-            out += ['']
-            return out
-        else:
+        if (
+            not self.use_plots
+            or not re.search(IMPORT_MATPLOTLIB_RE, examples_str)
+            or 'plot::' in examples_str
+        ):
             return self._str_section('Examples')
+        out = []
+        out += self._str_header('Examples')
+        out += ['.. plot::', '']
+        out += self._str_indent(self['Examples'])
+        out += ['']
+        return out
 
     def __str__(self, indent=0, func_role="obj"):
         ns = {
@@ -382,7 +374,7 @@ class SphinxDocString(NumpyDocString):
                 else self._str_member_list('Attributes'),
             'methods': self._str_member_list('Methods'),
         }
-        ns = dict((k, '\n'.join(v)) for k, v in ns.items())
+        ns = {k: '\n'.join(v) for k, v in ns.items()}
 
         rendered = self.template.render(**ns)
         return '\n'.join(self._str_indent(rendered.split('\n'), indent))

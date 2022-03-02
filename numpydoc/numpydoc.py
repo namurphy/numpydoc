@@ -48,20 +48,19 @@ def rename_references(app, what, name, obj, options, lines):
     references = set()
     for line in lines:
         line = line.strip()
-        m = re.match(r'^\.\. +\[(%s)\]' %
-                     app.config.numpydoc_citation_re,
-                     line, re.I)
-        if m:
+        if m := re.match(
+            r'^\.\. +\[(%s)\]' % app.config.numpydoc_citation_re, line, re.I
+        ):
             references.add(m.group(1))
 
     if references:
         # we use a hash to mangle the reference name to avoid invalid names
         sha = hashlib.sha256()
         sha.update(name.encode('utf8'))
-        prefix = 'R' + sha.hexdigest()[:HASH_LEN]
+        prefix = f'R{sha.hexdigest()[:HASH_LEN]}'
 
         for r in references:
-            new_r = prefix + '-' + r
+            new_r = f'{prefix}-{r}'
             for i, line in enumerate(lines):
                 lines[i] = lines[i].replace(f'[{r}]_',
                                             f'[{new_r}]_')
@@ -227,9 +226,10 @@ def mangle_signature(app, what, name, obj, options, sig, retann):
     if not hasattr(obj, '__doc__'):
         return
     doc = get_doc_object(obj, config={'show_class_members': False})
-    sig = (doc['Signature']
-           or _clean_text_signature(getattr(obj, '__text_signature__', None)))
-    if sig:
+    if sig := (
+        doc['Signature']
+        or _clean_text_signature(getattr(obj, '__text_signature__', None))
+    ):
         sig = re.sub("^[^(]*", "", sig)
         return sig, ''
 
@@ -284,9 +284,8 @@ def setup(app, get_doc_object_=get_doc_object):
     app.add_domain(NumpyPythonDomain)
     app.add_domain(NumpyCDomain)
 
-    metadata = {'version': __version__,
+    return {'version': __version__,
                 'parallel_read_safe': True}
-    return metadata
 
 
 def update_config(app, config=None):
@@ -309,9 +308,10 @@ def update_config(app, config=None):
     if "all" in config.numpydoc_validation_checks:
         block = deepcopy(config.numpydoc_validation_checks)
         config.numpydoc_validation_checks = valid_error_codes - block
-    # Ensure that the validation check set contains only valid error codes
-    invalid_error_codes = config.numpydoc_validation_checks - valid_error_codes
-    if invalid_error_codes:
+    if (
+        invalid_error_codes := config.numpydoc_validation_checks
+        - valid_error_codes
+    ):
         raise ValueError(
             f"Unrecognized validation code(s) in numpydoc_validation_checks "
             f"config value: {invalid_error_codes}"
@@ -325,9 +325,7 @@ def update_config(app, config=None):
         )
     config.numpydoc_validation_excluder = None
     if config.numpydoc_validation_exclude:
-        exclude_expr = re.compile(
-            r"|".join(exp for exp in config.numpydoc_validation_exclude)
-        )
+        exclude_expr = re.compile(r"|".join(config.numpydoc_validation_exclude))
         config.numpydoc_validation_excluder = exclude_expr
 
 
@@ -422,7 +420,7 @@ def match_items(lines, content_old):
     lines_old = content_old.data
     items_old = content_old.items
     j = 0
-    for i, line in enumerate(lines):
+    for line in lines:
         # go to next non-empty line in old:
         # line.strip() checks whether the string is all whitespace
         while j < len(lines_old) - 1 and not lines_old[j].strip():
