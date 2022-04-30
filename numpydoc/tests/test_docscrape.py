@@ -376,7 +376,7 @@ def line_by_line_compare(a, b, n_lines=None):
     a = [l.rstrip() for l in _strip_blank_lines(a).split('\n')][:n_lines]
     b = [l.rstrip() for l in _strip_blank_lines(b).split('\n')][:n_lines]
     assert len(a) == len(b)
-    for ii, (aa, bb) in enumerate(zip(a, b)):
+    for aa, bb in zip(a, b):
         assert aa == bb
 
 
@@ -805,14 +805,17 @@ def test_see_also(prefix):
             else:
                 assert desc, str([func, desc])
 
-            if func == 'func_h':
+            if (
+                func == 'func_h'
+                or func not in ['baz.obj_q', '~baz.obj_r']
+                and func != 'class_j'
+                and func in ['func_h1', 'func_h2']
+            ):
                 assert role == 'meth'
-            elif func == 'baz.obj_q' or func == '~baz.obj_r':
+            elif func in ['baz.obj_q', '~baz.obj_r']:
                 assert role == 'obj'
             elif func == 'class_j':
                 assert role == 'class'
-            elif func in ['func_h1', 'func_h2']:
-                assert role == 'meth'
             else:
                 assert role is None, str([func, role])
 
@@ -1369,11 +1372,7 @@ def test_nonstandard_property():
             self.__doc__ = doc
 
         def __get__(self, obj, type):
-            if obj is None:
-                # Only instances have actual _data, not classes
-                return self
-            else:
-                return obj._data.axes[self.axis]
+            return self if obj is None else obj._data.axes[self.axis]
 
         def __set__(self, obj, value):
             obj._set_axis(self.axis, value)
@@ -1387,7 +1386,7 @@ def test_nonstandard_property():
 
 
 def test_args_and_kwargs():
-    cfg = dict()
+    cfg = {}
     doc = SphinxDocString("""
     Parameters
     ----------

@@ -148,10 +148,10 @@ def make_xref(param_type, xref_aliases, xref_ignore):
         apply main function to the parts that do not match the pattern,
         combine the results
         """
-        results = []
         tokens = pattern.split(s)
         n = len(tokens)
         if n > 1:
+            results = []
             for i, tok in enumerate(tokens):
                 if pattern.match(tok):
                     results.append(tok)

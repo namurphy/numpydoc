@@ -33,11 +33,7 @@ class Reader:
            String with lines separated by '\\n'.
 
         """
-        if isinstance(data, list):
-            self._str = data
-        else:
-            self._str = data.split('\n')  # store string as list of lines
-
+        self._str = data if isinstance(data, list) else data.split('\n')
         self.reset()
 
     def __getitem__(self, n):
@@ -47,12 +43,11 @@ class Reader:
         self._l = 0  # current line nr
 
     def read(self):
-        if not self.eof():
-            out = self[self._l]
-            self._l += 1
-            return out
-        else:
+        if self.eof():
             return ''
+        out = self[self._l]
+        self._l += 1
+        return out
 
     def seek_next_non_empty_line(self):
         for l in self[self._l:]:
@@ -88,10 +83,7 @@ class Reader:
         return self.read_to_condition(is_unindented)
 
     def peek(self, n=0):
-        if self._l + n < len(self._str):
-            return self[self._l + n]
-        else:
-            return ''
+        return self[self._l + n] if self._l + n < len(self._str) else ''
 
     def is_empty(self):
         return not ''.join(self._str).strip()
@@ -228,11 +220,7 @@ class NumpyDocString(Mapping):
                 arg_name, arg_type = header.split(' :', maxsplit=1)
                 arg_name, arg_type = arg_name.strip(), arg_type.strip()
             else:
-                if single_element_is_type:
-                    arg_name, arg_type = '', header
-                else:
-                    arg_name, arg_type = header, ''
-
+                arg_name, arg_type = ('', header) if single_element_is_type else (header, '')
             desc = r.read_to_next_unindented_line()
             desc = dedent_lines(desc)
             desc = strip_blank_lines(desc)
@@ -378,7 +366,7 @@ class NumpyDocString(Mapping):
         self._parse_summary()
 
         sections = list(self._read_sections())
-        section_names = set([section for section, content in sections])
+        section_names = {section for section, content in sections}
 
         has_returns = 'Returns' in section_names
         has_yields = 'Yields' in section_names
@@ -453,14 +441,10 @@ class NumpyDocString(Mapping):
         return ['']
 
     def _str_summary(self):
-        if self['Summary']:
-            return self['Summary'] + ['']
-        return []
+        return self['Summary'] + [''] if self['Summary'] else []
 
     def _str_extended_summary(self):
-        if self['Extended Summary']:
-            return self['Extended Summary'] + ['']
-        return []
+        return self['Extended Summary'] + [''] if self['Extended Summary'] else []
 
     def _str_param_list(self, name):
         out = []
@@ -642,10 +626,7 @@ class ClassDoc(NumpyDocString):
 
         if config.get('show_class_members', True) and _exclude is not ALL:
             def splitlines_x(s):
-                if not s:
-                    return []
-                else:
-                    return s.splitlines()
+                return [] if not s else s.splitlines()
             for field, items in [('Methods', self.methods),
                                  ('Attributes', self.properties)]:
                 if not self[field]:

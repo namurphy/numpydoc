@@ -155,7 +155,7 @@ class Validator:
         >>> Validator._load_obj('datetime.datetime')
         <class 'datetime.datetime'>
         """
-        for maxsplit in range(0, name.count(".") + 1):
+        for maxsplit in range(name.count(".") + 1):
             module, *func_parts = name.rsplit(".", maxsplit)
             try:
                 obj = importlib.import_module(module)
@@ -330,7 +330,7 @@ class Validator:
             not missing
             and not extra
             and signature_params != all_params
-            and not (not signature_params and not all_params)
+            and (signature_params or all_params)
         ):
             errs.append(
                 error(
@@ -426,7 +426,7 @@ def _check_desc(desc, code_no_desc, code_no_upper, code_no_period, **kwargs):
             desc = desc[: desc.index(full_directive)].rstrip("\n")
     desc = desc.split("\n")
 
-    errs = list()
+    errs = []
     if not "".join(desc):
         errs.append(error(code_no_desc, **kwargs))
     else:
@@ -507,17 +507,23 @@ def validate(obj_name):
         errs.append(error("GL02"))
     if doc.double_blank_lines:
         errs.append(error("GL03"))
-    for line in doc.raw_doc.splitlines():
-        if re.match("^ *\t", line):
-            errs.append(error("GL05", line_with_tabs=line.lstrip()))
+    errs.extend(
+        error("GL05", line_with_tabs=line.lstrip())
+        for line in doc.raw_doc.splitlines()
+        if re.match("^ *\t", line)
+    )
 
     unexpected_sections = [
         section for section in doc.section_titles if section not in ALLOWED_SECTIONS
     ]
-    for section in unexpected_sections:
-        errs.append(
-            error("GL06", section=section, allowed_sections=", ".join(ALLOWED_SECTIONS))
+    errs.extend(
+        error(
+            "GL06",
+            section=section,
+            allowed_sections=", ".join(ALLOWED_SECTIONS),
         )
+        for section in unexpected_sections
+    )
 
     correct_order = [
         section for section in ALLOWED_SECTIONS if section in doc.section_titles
@@ -528,8 +534,7 @@ def validate(obj_name):
     if doc.deprecated and not doc.extended_summary.startswith(".. deprecated:: "):
         errs.append(error("GL09"))
 
-    directives_without_two_colons = doc.directives_without_two_colons
-    if directives_without_two_colons:
+    if directives_without_two_colons := doc.directives_without_two_colons:
         errs.append(error("GL10", directives=directives_without_two_colons))
 
     if not doc.summary:
@@ -556,12 +561,7 @@ def validate(obj_name):
 
     for param, kind_desc in doc.doc_all_parameters.items():
         if not param.startswith("*"):  # Check can ignore var / kwargs
-            if not doc.parameter_type(param):
-                if ":" in param:
-                    errs.append(error("PR10", param_name=param.split(":")[0]))
-                else:
-                    errs.append(error("PR04", param_name=param))
-            else:
+            if doc.parameter_type(param):
                 if doc.parameter_type(param)[-1] == ".":
                     errs.append(error("PR05", param_name=param))
                 # skip common_type_error checks when the param type is a set of
@@ -583,19 +583,22 @@ def validate(obj_name):
                                 wrong_type=wrong_type,
                             )
                         )
+            elif ":" in param:
+                errs.append(error("PR10", param_name=param.split(":")[0]))
+            else:
+                errs.append(error("PR04", param_name=param))
         errs.extend(_check_desc(
             kind_desc[1], "PR07", "PR08", "PR09", param_name=param))
 
     if doc.is_function_or_method:
-        if not doc.returns:
-            if doc.method_returns_something:
-                errs.append(error("RT01"))
-        else:
+        if doc.returns:
             if len(doc.returns) == 1 and doc.returns[0].name:
                 errs.append(error("RT02"))
             for name_or_type, type_, desc in doc.returns:
                 errs.extend(_check_desc(desc, "RT03", "RT04", "RT05"))
 
+        elif doc.method_returns_something:
+            errs.append(error("RT01"))
         if not doc.yields and "yield" in doc.method_source:
             errs.append(error("YD01"))
 
